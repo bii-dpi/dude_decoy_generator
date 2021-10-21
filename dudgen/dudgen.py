@@ -84,13 +84,13 @@ def collect_properties(subdir, sleep_time=15):
                         continue
                     # Run complete, wait for files to be copied back from /tmp
                     for dummy in xrange(30):
-                        if ( exists(join(tempdir, 'db.db.bz2')) and 
-                             exists(join(tempdir, "mitools.ism")) and 
+                        if ( exists(join(tempdir, 'db.db.bz2')) and
+                             exists(join(tempdir, "mitools.ism")) and
                              exists(join(tempdir, "solv.log")) ):
                             break
                         time.sleep(10)
                     else:
-                        print ( "Skip: Timed out waiting for files in %s" 
+                        print ( "Skip: Timed out waiting for files in %s"
                                                                 % tempdir )
                         continue
                     prefix = splitext(tempname)[0][:12]
@@ -132,9 +132,9 @@ def collect_ligands(gendir, sleep_time=15):
                 uniqs[lzid] = uniq
     return uniqs
 
-def generate_decoy_database(infile=None, outdir='.', loglevel=2, 
-                            fraction=dudzinc.FRACTION_TO_CUT, 
-                            fp_server=dudtools.FP_SERVER_OPTIONS["ecfp4"], 
+def generate_decoy_database(infile=None, outdir='.', loglevel=2,
+                            fraction=dudzinc.FRACTION_TO_CUT,
+                            fp_server=dudtools.FP_SERVER_OPTIONS["ecfp4"],
                             numdecoys=duddb.DECOY_SIZE, skipdb=False,
                             ligand_prot="mid", charge_start=False,
                             remote_disk=False):
@@ -163,17 +163,17 @@ def generate_decoy_database(infile=None, outdir='.', loglevel=2,
         else:
             dbname = duddb.DB_PREFIX + os.path.basename(genlig)[:3]
             dbname = join(outdir, dbname)
-            duddb.make_database(pp, dbname, genlig, inf, prot=ligand_prot, 
+            duddb.make_database(pp, dbname, genlig, inf, prot=ligand_prot,
                                 ftp=ftp)
             uniqs = collect_ligands(genlig)
         fn = dudzinc.CHARGE_FILE_LIG + dudzinc.CHARGE_FILE_EXT
         propfile = os.path.join(outdir, fn)
         lfps, lbcs = dudzinc.process_ligands(main_thread, propfile, uniqs,
                                              loglevel=loglevel)
-        decoys = dudzinc.query_decoys(mysqlp, fpp, cpup, filep, sdir, 
-                     uniqs, lfps, lbcs, loglevel=loglevel, fraction=fraction, 
+        decoys = dudzinc.query_decoys(mysqlp, fpp, cpup, filep, sdir,
+                     uniqs, lfps, lbcs, loglevel=loglevel, fraction=fraction,
                      luid_label="F")
-        picked = duddb.select_decoys(decoys, sdir, numdecoys=numdecoys, 
+        picked = duddb.select_decoys(decoys, sdir, numdecoys=numdecoys,
                                        luid_label='F', loglevel=loglevel)
         if not skipdb:
             duddb.make_decoy_db(pp, outdir, gendec, picked, ftp=ftp)
@@ -193,26 +193,26 @@ def generate_decoy_database(infile=None, outdir='.', loglevel=2,
 
 def main(argv):
     """Parse arguments."""
-    description = ( "Given a ligand list, generate DUD style decoys" + 
-                    " and DOCK flexibases. " + 
-               "ligand list is a file with a smiles and an ID on each line." + 
+    description = ( "Given a ligand list, generate DUD style decoys" +
+                    " and DOCK flexibases. " +
+               "ligand list is a file with a smiles and an ID on each line." +
                "ID must be formatted in C12345678 style, one letter, 8 digits")
     usage = "%prog [options]"
     version = "%prog: version 201109 - created by Michael Mysinger"
     parser = duddb.option_parser(usage, description, version)
     parser.set_defaults(prot="mid", charge_start=False, mysinger=False)
-    parser.add_option("-p", "--protonation", dest="prot", 
+    parser.add_option("-p", "--protonation", dest="prot",
            help=("protonation type for ligand databases: " +
                  "options = ref, mid, lo, hi, all  (default: %default)"))
-    parser.add_option("-m", "--mysinger-disk", action="store_true", 
+    parser.add_option("-m", "--mysinger-disk", action="store_true",
            help="use (fragile) remote disk servers on raid5")
     options = duddb.parse(parser, argv)
 
     start_time = time.time()
-    generate_decoy_database(infile=options.infile, outdir=options.outdir, 
-        loglevel=options.log_level, fraction=options.fraction, 
-        fp_server=options.fp_server, 
-        numdecoys=options.numdecoys, skipdb=options.skipdb,  
+    generate_decoy_database(infile=options.infile, outdir=options.outdir,
+        loglevel=options.log_level, fraction=options.fraction,
+        fp_server=options.fp_server,
+        numdecoys=options.numdecoys, skipdb=options.skipdb,
         ligand_prot=options.prot, charge_start=options.charge_start,
         remote_disk=options.mysinger_disk)
     print 'Program took %.1f seconds.' % (time.time() - start_time)
@@ -220,3 +220,4 @@ def main(argv):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
+
