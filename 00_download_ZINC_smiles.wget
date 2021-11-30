@@ -1,0 +1,2 @@
+# Download all ZINC SMILES files for compounds with molecular weight [300, 500]
+# Da and logP in (0, 5). These total 6.44 million SMILES.
