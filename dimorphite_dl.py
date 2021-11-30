@@ -33,17 +33,7 @@ except ImportError:
 
 def print_header():
     """Prints out header information."""
-    # Always let the user know a help file is available.
-    print("\nFor help, use: python dimorphite_dl.py --help")
-
-    # And always report citation information.
-    print("\nIf you use Dimorphite-DL in your research, please cite:")
-    print("Ropp PJ, Kaminsky JC, Yablonski S, Durrant JD (2019) Dimorphite-DL: An")
-    print(
-        "open-source program for enumerating the ionization states of drug-like small"
-    )
-    print("molecules. J Cheminform 11:14. doi:10.1186/s13321-019-0336-9.\n")
-
+    pass
 
 try:
     import rdkit

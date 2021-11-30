@@ -1,1 +1,5 @@
+__pycache__
 data/all_zinc.smi
+data/bindingdb_actives_protonated_dict.pkl
+data/dude_actives_protonated_dict.pkl
+data/raw_files

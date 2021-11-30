@@ -3,7 +3,7 @@ import os
 
 import numpy as np
 
-from progressbar import progressbar
+from tqdm import tqdm
 
 
 np.random.seed(12345)
@@ -17,7 +17,7 @@ def read_smi(fname):
 
 
 all_smiles = []
-for fname in progressbar(os.listdir("data/raw_files")):
+for fname in tqdm(os.listdir("data/raw_files")):
     all_smiles += read_smi(fname)
 all_smiles = np.unique(all_smiles)
 
