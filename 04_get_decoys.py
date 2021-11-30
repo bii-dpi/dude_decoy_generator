@@ -33,6 +33,3 @@ def get_decoys(all_candidates, active_smiles):
     assert len(curr_candidates) >= 50, \
             f"{active_smiles} doesn't have enough dissimilar candidates."
 
-
-
-
