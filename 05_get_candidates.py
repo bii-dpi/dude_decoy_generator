@@ -9,55 +9,64 @@
 #need to have shuffling
 
 import os
+import shutil
 import pickle
+import multiprocessing
 
 import numpy as np
 import pandas as pd
+import SharedArray as sa
 
 from rdkit import Chem, DataStructs
 from progressbar import progressbar
 from collections import defaultdict
 from rdkit.Chem.Crippen import MolLogP
-from bisect import bisect_left, bisect_right
 from rdkit.Chem.Descriptors import ExactMolWt
 from concurrent.futures import ProcessPoolExecutor
 from rdkit.Chem.rdMolDescriptors import (CalcNumRotatableBonds,
                                          CalcNumHBA,
                                          CalcNumHBD)
 
-from ctypes import py_object
-from multiprocessing import Value
-
 
 
 np.random.seed(12345)
 
+shutil.rmtree("data/sa", ignore_errors=True)
+os.makedirs("data/sa")
+
+
 DATASET = "DUDE"
 
 
-def read_csv(prop):
-    curr_df = pd.read_csv(f"data/all_zinc_w_prop_{prop}.csv")
-    if prop in COLUMNS[3:]:
-        curr_df[[prop]] = curr_df[[prop]].astype(np.int16)
-    else:
-        curr_df[[prop]] = curr_df[[prop]].astype(np.float16)
+def create_sa(prop):
+    smiles = np.load(f"data/sorted/{prop}_smiles_reorder.npy")
+    values = np.load(f"data/sorted/{prop}_values.npy")
 
-    return curr_df #(curr_df.iloc[:, 0].tolist(), curr_df.iloc[:, 1].tolist())
+    smiles_ = sa.create(f"file://data/sa/{prop}_smiles", smiles.shape, dtype=smiles.dtype)
+    values_ = sa.create(f"file://data/sa/{prop}_values", values.shape, dtype=values.dtype)
+
+    np.copyto(smiles_, smiles)
+    np.copyto(values_, values)
+
+    return smiles_, values_
 
 
 def get_smiles_in_range(value, delta, curr_df):
-    left_pos = bisect_left(curr_df.iloc[:, 1], value - delta)
-    right_pos = bisect_right(curr_df.iloc[:, 1], value + delta)
+    left_pos = np.searchsorted(curr_df[1], value - delta, side="left")
+    right_pos = np.searchsorted(curr_df[1], value + delta, side="right")
 
-    if left_pos == len(curr_df.iloc[:, 1]):
+    if left_pos == len(curr_df[1]):
         left_pos -= 1
-    if right_pos == len(curr_df.iloc[:, 1]):
+    if right_pos == len(curr_df[1]):
         right_pos -= 1
 
     assert right_pos >= left_pos
 
     try:
-        return set(curr_df.iloc[left_pos: right_pos + 1, 0])
+        """
+        return set(curr_df[0][left_pos: right_pos + 1])
+        """
+        return curr_df[0][left_pos: right_pos + 1]
     except:
         raise Exception(f"{left_pos}, {right_pos}, {value}")
 
@@ -68,12 +77,22 @@ def get_property_matched(curr_ligand_props, window_index):
         if all_matched is None:
             all_matched = get_smiles_in_range(curr_ligand_props[i],
                                               RANGES[i][window_index],
-                                              data[i])#SORTED_ZINC_DFS[i])
+                                              SORTED_ZINC_DFS[i])
         else:
+            """
             all_matched &= get_smiles_in_range(curr_ligand_props[i],
                                                RANGES[i][window_index],
-                                               data[i])#SORTED_ZINC_DFS[i])
-
+                                               SORTED_ZINC_DFS[i])
+            if len(all_matched) == 0:
+                return all_matched
+            """
+            all_matched = np.intersect1d(all_matched,
+                                         get_smiles_in_range(curr_ligand_props[i],
+                                                             RANGES[i][window_index],
+                                                             SORTED_ZINC_DFS[i]),
+                                         assume_unique=True)
+            if len(all_matched) == 0:
+                return None
     return all_matched
 
 
@@ -103,57 +122,97 @@ def get_candidates(smiles_list):
     ligand_mols = [Chem.MolFromSmiles(smiles) for smiles in smiles_list]
     ligand_props = [get_mol_properties(mol) for mol in ligand_mols]
 
-    all_property_matched = set()
+    all_property_matched = []
     for curr_ligand_props in ligand_props:
         window_index = 0
+        """
         curr_property_matched = set()
+        """
+        curr_property_matched = []
         while len(curr_property_matched) < 50 and window_index < 7:
             latest = get_property_matched(curr_ligand_props,
                                           window_index)
-            tried_union = curr_property_matched | latest
-            if len(tried_union) > 50:
-                latest -= curr_property_matched
-                try:
-                    curr_property_matched |= \
-                        set(np.random.choice(list(latest),
-                                             50 - len(curr_property_matched),
-                                             replace=False).tolist())
-                except:
-                    curr_property_matched |= latest
-            else:
-                curr_property_matched = tried_union
             window_index += 1
-        all_property_matched |= curr_property_matched
 
-    print(len(all_property_matched))
+            """
+            if len(latest) == 0:
+                continue
+            """
+            if latest is None:
+                continue
+
+            """
+            tried_union = curr_property_matched | latest
+            """
+            if not len(curr_property_matched):
+                tried_union = latest.copy()
+            else:
+                tried_union = np.union1d(curr_property_matched, latest)
+
+            if len(tried_union) > 50:
+                """
+                latest -= curr_property_matched
+                """
+                latest = np.setdiff1d(latest, curr_property_matched,
+                                      assume_unique=True)
+                try:
+                    """
+                    curr_property_matched |= set(np.random.choice(list(latest),
+                                                    50 - len(curr_property_matched),
+                                                    replace=False))
+                    """
+                    curr_property_matched = \
+                        np.union1d(curr_property_matched,
+                                   np.random.choice(latest,
+                                                    50 - len(curr_property_matched),
+                                                    replace=False))
+                except Exception as e:
+                    #print(e)
+                    """
+                    curr_property_matched |= latest
+                    """
+                    curr_property_matched = np.union1d(latest,
+                                                       curr_property_matched)
+            else:
+                curr_property_matched = tried_union.copy()
+        if not len(all_property_matched):
+            all_property_matched = curr_property_matched.copy()
+        else:
+            """
+            all_property_matched |= curr_property_matched
+            """
+            all_property_matched = np.union1d(curr_property_matched,
+                                              all_property_matched)
+        #print("prop", len(all_property_matched))
+
+    #print("prop", len(all_property_matched))
 
     return all_property_matched
 
 
 def write_candidate_dict(all_pdb_ids):
     """Write the candidate dictionary for the dataset."""
-
-    def init_pool(the_data):
-        global data
-        data = the_data
-
     all_pdb_ids = [pdb_id for pdb_id in all_pdb_ids
                    if not os.path.isfile(f"data/candidates/{pdb_id}_candidate_dict.pkl")]
+    candidate_dict = defaultdict(dict)
     for pdb_id in progressbar(all_pdb_ids):
         """
         for smiles in progressbar(LIGAND_DICT[pdb_id]):
             candidate_dict[pdb_id][smiles] = \
                 get_candidates(LIGAND_DICT[pdb_id][smiles])
         """
-        with ProcessPoolExecutor(max_workers=80, initializer=init_pool,
-                                 initargs=(SORTED_ZINC_DFS,)) as executor:
+        with ProcessPoolExecutor(max_workers=80) as executor:
             candidates = executor.map(get_candidates,
                                       [LIGAND_DICT[pdb_id][smiles]
                                        for smiles in LIGAND_DICT[pdb_id]])
-        curr_candidate_dict = dict(zip(list(LIGAND_DICT[pdb_id].keys()),
-                                       [list(sublist) for sublist in candidates]))
+        """
+        curr_candidate_dict = dict()
+        curr_smiles = LIGAND_DICT[pdb_id]
+        for i, subset in enumerate(candidates):
+            curr_candidate_dict[curr_smiles[i]] = subset
         with open(f"data/candidates/{pdb_id}_candidate_dict.pkl", "wb") as f:
             pickle.dump(curr_candidate_dict, f)
+        """
 
     print("Done.")
 
@@ -173,12 +232,7 @@ if __name__ == "__main__":
     print(f"Creating decoy candidates for {DATASET}.")
     print("[1/3] Loading data...")
     LIGAND_DICT = pd.read_pickle(f"data/{DATASET.lower()}_actives_protonated_dict.pkl")
-    SORTED_ZINC_DFS = [read_csv(prop) for prop in COLUMNS[1:]]
-    """
-    k = Value(py_object)
-    k.value = SORTED_ZINC_DFS
-    """
-
+    SORTED_ZINC_DFS = [create_sa(prop) for prop in COLUMNS[1:]]
 
     print(f"[2/3] Getting candidates for {len(LIGAND_DICT)} proteins...")
     write_candidate_dict(LIGAND_DICT.keys())
