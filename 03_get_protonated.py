@@ -19,6 +19,13 @@ PATHS = ["../get_data/BindingDB/bindingdb_actives",
          "../get_data/DUDE/dude_actives"]
 
 
+def get_net_charge(smiles):
+    pos = smiles.count("[+") + smiles.count("+]")
+    neg = smiles.count("[-") + smiles.count("-]")
+
+    return pos - neg
+
+
 def get_mol_dict(path):
     print("[1/3] Getting Mol object for each ligand...")
     with open(path, "r") as f:
@@ -42,7 +49,8 @@ def get_properties(mol):
 
     return np.array([ExactMolWt(mol), MolLogP(mol),
                      CalcNumRotatableBonds(mol),
-                     CalcNumHBA(mol), CalcNumHBD(mol)])
+                     CalcNumHBA(mol), CalcNumHBD(mol),
+                     get_net_charge(Chem.MolToSmiles(mol))])
 
 
 def get_protonated_single(mol):

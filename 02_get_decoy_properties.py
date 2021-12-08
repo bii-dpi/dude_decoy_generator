@@ -7,12 +7,20 @@ from rdkit.Chem.rdMolDescriptors import (CalcNumRotatableBonds,
                                          CalcNumHBD)
 
 
+def get_net_charge(smiles):
+    pos = smiles.count("[+") + smiles.count("+]")
+    neg = smiles.count("[-") + smiles.count("-]")
+
+    return pos - neg
+
+
 def get_properties(smiles):
     # XXX: ExactMolWt includes H-atom weight. Should it?
     # XXX: CalcNumRotatableBonds is not "strict". Should it be?
     # XXX: DUD-E authors used a different program that calculated miLogP. Is our
     # proxy OK?
-    # TODO: Their sixth descriptor was "added net charge". What does that mean?
+    # XXX: my interpretation of net charge just involves adding up the [+]s and
+    # [-]s. Is that correct?
 
     try:
         mol = Chem.MolFromSmiles(smiles)
@@ -21,12 +29,13 @@ def get_properties(smiles):
 
     properties = [ExactMolWt(mol), MolLogP(mol),
                   CalcNumRotatableBonds(mol),
-                  CalcNumHBA(mol), CalcNumHBD(mol)]
-    return " ".join([str(prop) for prop in properties])
+                  CalcNumHBA(mol), CalcNumHBD(mol),
+                  get_net_charge(smiles)]
+    return ",".join([str(prop) for prop in properties])
 
 
 def get_properties_batch(smiles_batch):
-    return [f"{smiles} {get_properties(smiles)}" for smiles in smiles_batch]
+    return [f"{smiles},{get_properties(smiles)}" for smiles in smiles_batch]
 
 
 print("Appending properties to data/all_zinc.smi")
@@ -46,12 +55,12 @@ with ProcessPoolExecutor() as executor:
     with_properties = executor.map(get_properties_batch, input_subsets)
 
 with_properties = [line for sublist in with_properties
-                   for line in sublist if len(line.split()) > 1]
+                   for line in sublist if line.split(",")[1]]
 
 print(f"{len(all_zinc) - len(with_properties)} invalid compounds removed.")
 
-with open("data/all_zinc_w_prop.smi", "w") as f:
+with open("data/all_zinc_w_prop.csv", "w") as f:
     f.write("\n".join(with_properties))
 
-print("Written data/all_zinc_w_prop.smi")
+print("Written data/all_zinc_w_prop.csv")
 
