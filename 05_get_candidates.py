@@ -62,13 +62,7 @@ def get_smiles_in_range(value, delta, curr_df):
 
     assert right_pos >= left_pos
 
-    try:
-        """
-        return set(curr_df[0][left_pos: right_pos + 1])
-        """
-        return curr_df[0][left_pos: right_pos + 1]
-    except:
-        raise Exception(f"{left_pos}, {right_pos}, {value}")
+    return curr_df[0][left_pos: right_pos + 1]
 
 
 def get_property_matched(curr_ligand_props, window_index):
@@ -79,13 +73,6 @@ def get_property_matched(curr_ligand_props, window_index):
                                               RANGES[i][window_index],
                                               SORTED_ZINC_DFS[i])
         else:
-            """
-            all_matched &= get_smiles_in_range(curr_ligand_props[i],
-                                               RANGES[i][window_index],
-                                               SORTED_ZINC_DFS[i])
-            if len(all_matched) == 0:
-                return all_matched
-            """
             all_matched = np.intersect1d(all_matched,
                                          get_smiles_in_range(curr_ligand_props[i],
                                                              RANGES[i][window_index],
@@ -125,42 +112,24 @@ def get_candidates(smiles_list):
     all_property_matched = []
     for curr_ligand_props in ligand_props:
         window_index = 0
-        """
-        curr_property_matched = set()
-        """
         curr_property_matched = []
         while len(curr_property_matched) < 50 and window_index < 7:
             latest = get_property_matched(curr_ligand_props,
                                           window_index)
             window_index += 1
 
-            """
-            if len(latest) == 0:
-                continue
-            """
             if latest is None:
                 continue
 
-            """
-            tried_union = curr_property_matched | latest
-            """
             if not len(curr_property_matched):
                 tried_union = latest.copy()
             else:
                 tried_union = np.union1d(curr_property_matched, latest)
 
             if len(tried_union) > 50:
-                """
-                latest -= curr_property_matched
-                """
                 latest = np.setdiff1d(latest, curr_property_matched,
                                       assume_unique=True)
                 try:
-                    """
-                    curr_property_matched |= set(np.random.choice(list(latest),
-                                                    50 - len(curr_property_matched),
-                                                    replace=False))
-                    """
                     curr_property_matched = \
                         np.union1d(curr_property_matched,
                                    np.random.choice(latest,
@@ -168,9 +137,6 @@ def get_candidates(smiles_list):
                                                     replace=False))
                 except Exception as e:
                     #print(e)
-                    """
-                    curr_property_matched |= latest
-                    """
                     curr_property_matched = np.union1d(latest,
                                                        curr_property_matched)
             else:
@@ -178,9 +144,6 @@ def get_candidates(smiles_list):
         if not len(all_property_matched):
             all_property_matched = curr_property_matched.copy()
         else:
-            """
-            all_property_matched |= curr_property_matched
-            """
             all_property_matched = np.union1d(curr_property_matched,
                                               all_property_matched)
         #print("prop", len(all_property_matched))
@@ -194,7 +157,9 @@ def write_candidate_dict(all_pdb_ids):
     """Write the candidate dictionary for the dataset."""
     all_pdb_ids = [pdb_id for pdb_id in all_pdb_ids
                    if not os.path.isfile(f"data/candidates/{pdb_id}_candidate_dict.pkl")]
+    """
     candidate_dict = defaultdict(dict)
+    """
     for pdb_id in progressbar(all_pdb_ids):
         """
         for smiles in progressbar(LIGAND_DICT[pdb_id]):
@@ -205,14 +170,13 @@ def write_candidate_dict(all_pdb_ids):
             candidates = executor.map(get_candidates,
                                       [LIGAND_DICT[pdb_id][smiles]
                                        for smiles in LIGAND_DICT[pdb_id]])
-        """
+
         curr_candidate_dict = dict()
-        curr_smiles = LIGAND_DICT[pdb_id]
+        curr_smiles = list(LIGAND_DICT[pdb_id].keys())
         for i, subset in enumerate(candidates):
             curr_candidate_dict[curr_smiles[i]] = subset
         with open(f"data/candidates/{pdb_id}_candidate_dict.pkl", "wb") as f:
             pickle.dump(curr_candidate_dict, f)
-        """
 
     print("Done.")
 
