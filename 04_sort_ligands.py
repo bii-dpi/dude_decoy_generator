@@ -20,6 +20,8 @@ print(all_zinc_df.columns)
 np.save("data/all_zinc_smiles_ref.npy", all_zinc_df[["smiles"]].to_numpy())
 
 for column in tqdm(COLUMNS[1:]):
+    # TODO: Need to make sure things are flattened here. Does not seem to cause
+    # issues in 05, but still.
     smiles_reorder = all_zinc_df.loc[:, column].argsort().to_numpy()
     np.save(f"data/sorted/{column}_smiles_reorder.npy",
             smiles_reorder)

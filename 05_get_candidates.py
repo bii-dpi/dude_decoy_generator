@@ -194,10 +194,10 @@ if __name__ == "__main__":
 
 
     print(f"Creating decoy candidates for {DATASET}.")
-    print("[1/3] Loading data...")
+    print("[1/2] Loading data...")
     LIGAND_DICT = pd.read_pickle(f"data/{DATASET.lower()}_actives_protonated_dict.pkl")
     SORTED_ZINC_DFS = [create_sa(prop) for prop in COLUMNS[1:]]
 
-    print(f"[2/3] Getting candidates for {len(LIGAND_DICT)} proteins...")
+    print(f"[2/2] Getting candidates for {len(LIGAND_DICT)} proteins...")
     write_candidate_dict(LIGAND_DICT.keys())
 
