@@ -15,6 +15,5 @@ Instructions:
 Credit: [Dimorphite-DL](https://durrantlab.pitt.edu/dimorphite-dl/) is used to generate ligands' protonated states, an essential step of DUD-E style decoy creation.
 
 TODO:
-1. Add final deduplication step.
-2. Generalize dataset specification.
-3. Ensure data folders are created (and destroyed) automatically.
+1. Generalize dataset specification.
+2. Ensure data folders are created (and destroyed) automatically.
