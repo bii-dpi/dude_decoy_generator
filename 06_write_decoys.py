@@ -137,6 +137,7 @@ print("[5/X] Assigning qualifying candidates...")
 actives = [Active(active_pair, assignable_decoys)
                    for active_pair, assignable_decoys in
                    all_candidate_dict.items()]
+actives.sort()
 
 reversed_dict = {cand_smiles: actives_smiles
                  for cand_smiles, actives_smiles in reversed_dict.items()
@@ -148,9 +149,9 @@ qualifying_cands = [pair[0] for pair in
                     sorted(qualifying_cands, key=lambda pair: pair[1])]
 
 
-num_done = 0
+
 while not num_done == len(all_candidate_dict):
-    for cand in qualifying_cands[:3000]:
+    for cand in progressbar(qualifying_cands):
         for active in actives:
             if not active.has_50_decoys() and active.can_assign(cand):
                 active.add_decoy(cand)
@@ -164,5 +165,13 @@ print("")
 
 
 print("[6/X] Writing assigned decoys to disk...")
+rows = []
+for active in actives:
+    rows += active.get_rows()
+np.random.shuffle(rows)
+
+with open(f"data/{DATASET.lower()}_decoys", "w") as f:
+    f.write("\n".join(rows))
 
 print("Done. (and some stats)")
+
