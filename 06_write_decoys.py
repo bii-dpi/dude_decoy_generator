@@ -4,6 +4,7 @@ import pickle
 import numpy as np
 import pandas as pd
 
+from active import Active
 from rdkit.Chem import AllChem
 from collections import Counter
 from rdkit import Chem, DataStructs
@@ -120,7 +121,7 @@ maximum_tc = maximum_tc[:(len(maximum_tc) // 4)]
 qualifying_cands = dict(maximum_tc)
 max_tcs = list(qualifying_cands.values())
 print(f"Got {len(qualifying_cands)} for {len(reversed_dict)} actives.")
-print(f"(Mean Tc: {np.mean(max_tcs):.3f} +- {np.std(max_tcs):.3f} "
+print(f"Mean Tc: {np.mean(max_tcs):.3f} +- {np.std(max_tcs):.3f} "
       f"(min: {np.min(max_tcs):.3f}, max: {np.max(max_tcs):.3f})")
 
 all_candidate_dict = {active_smiles: [cand for cand in sublist
@@ -133,14 +134,33 @@ print(f"{len(all_candidate_dict) * 100 / num_active_smiles:.2f}% actives do not 
       f"at least 50 qualifying candidate decoys; not assigning any to them.")
 
 print("[5/X] Assigning qualifying candidates...")
-assigned_decoys = {active_smiles: [] for active_smiles in all_candidate_dict}
+actives = [Active(active_pair, assignable_decoys)
+                   for active_pair, assignable_decoys in
+                   all_candidate_dict.items()]
 
-maximum_tc = [[cand_smiles, max_tcs]
-              for cand_smiles, max_tcs in maximum_tc.items()]
-maximum_tc = sorted(maximum_tc, key=lambda pair: pair[1])
-for cand in qualifying_cands:
-    pass
+reversed_dict = {cand_smiles: actives_smiles
+                 for cand_smiles, actives_smiles in reversed_dict.items()
+                 if cand_smiles in qualifying_cands}
 
+qualifying_cands = [[cand_smiles, len(actives_smiles)]
+                    for cand_smiles, actives_smiles in reversed_dict.items()]
+qualifying_cands = [pair[0] for pair in
+                    sorted(qualifying_cands, key=lambda pair: pair[1])]
+
+
+num_done = 0
+while not num_done == len(all_candidate_dict):
+    for cand in qualifying_cands[:3000]:
+        for active in actives:
+            if not active.has_50_decoys() and active.can_assign(cand):
+                active.add_decoy(cand)
+                break
+        actives.sort()
+
+    num_done = np.sum([active.has_50_decoys() for active in actives])
+    print(f"{num_done * 100 / len(all_candidate_dict):.2f}% done.",
+          end="\r")
+print("")
 
 
 print("[6/X] Writing assigned decoys to disk...")
