@@ -4,7 +4,6 @@ import pickle
 import numpy as np
 import pandas as pd
 
-from active import Active
 from rdkit.Chem import AllChem
 from collections import Counter
 from rdkit import Chem, DataStructs
@@ -47,7 +46,8 @@ def get_max_tc(cand_smiles, pairs):
 
 print(f"Writing decoys for {DATASET} dataset.")
 
-print("[1/X] Concatenating decoy candidate dictionaries...")
+
+print("[1/6] Concatenating decoy candidate dictionaries...")
 all_pdb_ids = list(pd.read_pickle(
                     f"data/{DATASET.lower()}_actives_protonated_dict.pkl").keys())
 all_candidate_dict = dict()
@@ -57,33 +57,24 @@ for pdb_id in progressbar(all_pdb_ids):
 all_candidates = [smiles for sublist in all_candidate_dict.values()
                   for smiles in sublist]
 candidate_counts = Counter(all_candidates)
+raw_counts = list(candidate_counts.values())
 
-print(len(candidate_counts) / len(all_candidates))
+print(f"{len(candidate_counts)} unique candidates out of a total of"
+      f" {len(all_candidates)} "
+      f"({len(candidate_counts) * 100 / len(all_candidates):.2f}%)")
+
+print(f"Mean duplication: {np.mean(raw_counts):.0f} +- {np.std(raw_counts):.0f} "
+      f"(min: {np.min(raw_counts):.0f}, max: {np.max(raw_counts):.0f})")
 
 
-print("[2/X] Reversing concatenated dictionary...")
+print("[2/6] Reversing concatenated dictionary...")
 reversed_dict = defaultdict(list)
 for pair in progressbar(all_candidate_dict):
     for cand_smiles in all_candidate_dict[pair]:
         reversed_dict[cand_smiles].append(pair)
 
 
-print("[3/X] Getting maximum Tc values for each candidate...")
-"""
-reversed_dict = {cand_smiles: sublist for cand_smiles, sublist in
-reversed_dict.items() if cand_smiles in qualifying_cands}
-
-print(len(reversed_dict) / 102)
-
-# XXX: Much slower to do it in this more intuitive way.
-maximum_tc = dict()
-freqs = dict()
-for cand_smiles, pairs in progressbar(reversed_dict.items()):
-    maximum_tc[cand_smiles] = get_max_tc(cand_smiles, pairs)
-    freqs[cand_smiles] = len(pairs)
-
-
-"""
+print("[3/6] Getting maximum Tc values for each candidate...")
 # TODO: if batched properly, this could be done many times faster.
 if not os.path.exists("maximum_tc.pkl"):
     maximum_tc = defaultdict(int)
@@ -113,14 +104,15 @@ else:
     maximum_tc = pd.read_pickle("maximum_tc.pkl")
 
 
-print("[4/X] Getting qualifying candidate decoys...")
+print("[4/6] Getting qualifying candidate decoys...")
+# XXX: What's the purpose of this relative cutoff relative to a hard one?
 maximum_tc = [[cand_smiles, max_tcs]
               for cand_smiles, max_tcs in maximum_tc.items()]
 maximum_tc = sorted(maximum_tc, key=lambda pair: pair[1])
 maximum_tc = maximum_tc[:(len(maximum_tc) // 4)]
 qualifying_cands = dict(maximum_tc)
 max_tcs = list(qualifying_cands.values())
-print(f"Got {len(qualifying_cands)} for {len(reversed_dict)} actives.")
+print(f"Got {len(qualifying_cands)} for {len(all_candidate_dict)} actives.")
 print(f"Mean Tc: {np.mean(max_tcs):.3f} +- {np.std(max_tcs):.3f} "
       f"(min: {np.min(max_tcs):.3f}, max: {np.max(max_tcs):.3f})")
 
@@ -130,48 +122,29 @@ all_candidate_dict = {active_smiles: [cand for cand in sublist
 num_active_smiles = len(all_candidate_dict)
 all_candidate_dict = {active_smiles: sublist for active_smiles, sublist in
                        all_candidate_dict.items() if len(sublist) >= 50}
-print(f"{len(all_candidate_dict) * 100 / num_active_smiles:.2f}% actives do not have "
-      f"at least 50 qualifying candidate decoys; not assigning any to them.")
+print(f"{100 - len(all_candidate_dict) * 100 / num_active_smiles:.2f}% actives "
+      f"do not have at least 50 qualifying candidate decoys; not assigning any to them.")
 
-print("[5/X] Assigning qualifying candidates...")
-actives = [Active(active_pair, assignable_decoys)
-                   for active_pair, assignable_decoys in
-                   all_candidate_dict.items()]
-actives.sort()
+print("[5/6] Assigning qualifying candidates...")
+for pair, sublist in progressbar(all_candidate_dict.items()):
+    all_candidate_dict[pair] = \
+        sorted(sublist,
+               key=lambda cand_smiles: candidate_counts[cand_smiles])[:50]
 
-reversed_dict = {cand_smiles: actives_smiles
-                 for cand_smiles, actives_smiles in reversed_dict.items()
-                 if cand_smiles in qualifying_cands}
+# Print something about duplication here.
+all_decoys = [decoy_smiles for sublist in all_candidate_dict.values()
+              for decoy_smiles in sublist]
+print(f"{len(set(all_decoys)) * 100 / len(all_decoys):.2f}% of assigned decoys are unique.")
 
-qualifying_cands = [[cand_smiles, len(actives_smiles)]
-                    for cand_smiles, actives_smiles in reversed_dict.items()]
-qualifying_cands = [pair[0] for pair in
-                    sorted(qualifying_cands, key=lambda pair: pair[1])]
-
-
-
-while not num_done == len(all_candidate_dict):
-    for cand in progressbar(qualifying_cands):
-        for active in actives:
-            if not active.has_50_decoys() and active.can_assign(cand):
-                active.add_decoy(cand)
-                break
-        actives.sort()
-
-    num_done = np.sum([active.has_50_decoys() for active in actives])
-    print(f"{num_done * 100 / len(all_candidate_dict):.2f}% done.",
-          end="\r")
-print("")
-
-
-print("[6/X] Writing assigned decoys to disk...")
+print("[6/6] Writing assigned decoys to disk...")
 rows = []
-for active in actives:
-    rows += active.get_rows()
+for pair, sublist in progressbar(all_candidate_dict.items()):
+    for decoy_smiles in sublist:
+        rows.append(f"{pair[0]} {pair[1]} {decoy_smiles}")
 np.random.shuffle(rows)
 
 with open(f"data/{DATASET.lower()}_decoys", "w") as f:
     f.write("\n".join(rows))
 
-print("Done. (and some stats)")
+print("Done.")
 
