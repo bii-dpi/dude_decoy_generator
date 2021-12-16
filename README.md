@@ -17,3 +17,4 @@ Credit: [Dimorphite-DL](https://durrantlab.pitt.edu/dimorphite-dl/) is used to g
 TODO:
 1. Generalize dataset specification.
 2. Ensure data folders are created (and destroyed) automatically.
+3. **Ask if the protonated states are taken as individuals until the end: or else they will not be used at all.**
