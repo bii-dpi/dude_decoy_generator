@@ -1,17 +1,11 @@
 from rdkit import Chem
 from rdkit.Chem.Crippen import MolLogP
 from rdkit.Chem.Descriptors import ExactMolWt
+from rdkit.Chem.rdmolops import GetFormalCharge
 from concurrent.futures import ProcessPoolExecutor
 from rdkit.Chem.rdMolDescriptors import (CalcNumRotatableBonds,
                                          CalcNumHBA,
                                          CalcNumHBD)
-
-
-def get_net_charge(smiles):
-    pos = smiles.count("[+") + smiles.count("+]")
-    neg = smiles.count("[-") + smiles.count("-]")
-
-    return pos - neg
 
 
 def get_properties(smiles):
@@ -19,8 +13,6 @@ def get_properties(smiles):
     # XXX: CalcNumRotatableBonds is not "strict". Should it be?
     # XXX: DUD-E authors used a different program that calculated miLogP. Is our
     # proxy OK?
-    # XXX: my interpretation of net charge just involves adding up the [+]s and
-    # [-]s. Is that correct?
 
     try:
         mol = Chem.MolFromSmiles(smiles)
@@ -30,7 +22,7 @@ def get_properties(smiles):
     properties = [ExactMolWt(mol), MolLogP(mol),
                   CalcNumRotatableBonds(mol),
                   CalcNumHBA(mol), CalcNumHBD(mol),
-                  get_net_charge(smiles)]
+                  GetFormalCharge(mol)]
     return ",".join([str(prop) for prop in properties])
 
 

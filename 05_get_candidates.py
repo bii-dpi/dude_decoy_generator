@@ -22,6 +22,7 @@ from progressbar import progressbar
 from collections import defaultdict
 from rdkit.Chem.Crippen import MolLogP
 from rdkit.Chem.Descriptors import ExactMolWt
+from rdkit.Chem.rdmolops import GetFormalCharge
 from concurrent.futures import ProcessPoolExecutor
 from rdkit.Chem.rdMolDescriptors import (CalcNumRotatableBonds,
                                          CalcNumHBA,
@@ -35,7 +36,7 @@ shutil.rmtree("data/sa", ignore_errors=True)
 os.makedirs("data/sa")
 
 
-DATASET = "DUDE"
+DATASET = "BindingDB"
 
 
 def create_sa(prop):
@@ -85,26 +86,14 @@ def get_property_matched(curr_ligand_props, window_index):
 
 def get_mol_properties(mol):
     """Get the six to-match properties for the Mol object."""
-    def get_net_charge(mol):
-        """Get molecule's net charge."""
-        smiles = Chem.MolToSmiles(mol)
-        pos = smiles.count("[+") + smiles.count("+]")
-        neg = smiles.count("[-") + smiles.count("-]")
-
-        return pos - neg
-
     return [ExactMolWt(mol), MolLogP(mol),
             CalcNumRotatableBonds(mol),
             CalcNumHBA(mol), CalcNumHBD(mol),
-            get_net_charge(mol)]
+            GetFormalCharge(mol)]
 
 
 def get_candidates(smiles_list):
     """Get candidate decoys for a single ligand."""
-    if len(smiles_list) > 10:
-        smiles_list = [smiles_list[0]] + \
-                        np.random.choice(smiles_list[1:],
-                                         size=9, replace=False).tolist()
 
     ligand_mols = [Chem.MolFromSmiles(smiles) for smiles in smiles_list]
     ligand_props = [get_mol_properties(mol) for mol in ligand_mols]
@@ -113,7 +102,7 @@ def get_candidates(smiles_list):
     for curr_ligand_props in ligand_props:
         window_index = 0
         curr_property_matched = []
-        while len(curr_property_matched) < 50 and window_index < 7:
+        while len(curr_property_matched) < 9000 and window_index < 7:
             latest = get_property_matched(curr_ligand_props,
                                           window_index)
             window_index += 1
@@ -126,14 +115,14 @@ def get_candidates(smiles_list):
             else:
                 tried_union = np.union1d(curr_property_matched, latest)
 
-            if len(tried_union) > 50:
+            if len(tried_union) > 9000:
                 latest = np.setdiff1d(latest, curr_property_matched,
                                       assume_unique=True)
                 try:
                     curr_property_matched = \
                         np.union1d(curr_property_matched,
                                    np.random.choice(latest,
-                                                    50 - len(curr_property_matched),
+                                                    9000 - len(curr_property_matched),
                                                     replace=False))
                 except Exception as e:
                     #print(e)

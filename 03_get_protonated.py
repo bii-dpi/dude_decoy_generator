@@ -7,6 +7,7 @@ from rdkit import Chem, RDLogger
 from collections import defaultdict
 from rdkit.Chem.Crippen import MolLogP
 from rdkit.Chem.Descriptors import ExactMolWt
+from rdkit.Chem.rdmolops import GetFormalCharge
 from concurrent.futures import ProcessPoolExecutor
 from rdkit.Chem.rdMolDescriptors import (CalcNumRotatableBonds,
                                          CalcNumHBA,
@@ -17,13 +18,6 @@ RDLogger.DisableLog("rdApp.*")
 
 PATHS = ["../get_data/BindingDB/bindingdb_actives",
          "../get_data/DUDE/dude_actives"]
-
-
-def get_net_charge(smiles):
-    pos = smiles.count("[+") + smiles.count("+]")
-    neg = smiles.count("[-") + smiles.count("-]")
-
-    return pos - neg
 
 
 def get_mol_dict(path):
@@ -45,12 +39,11 @@ def get_properties(mol):
     # XXX: CalcNumRotatableBonds is not "strict". Should it be?
     # XXX: DUD-E authors used a different program that calculated miLogP. Is our
     # proxy OK?
-    # TODO: Their sixth descriptor was "added net charge". What does that mean?
 
     return np.array([ExactMolWt(mol), MolLogP(mol),
                      CalcNumRotatableBonds(mol),
                      CalcNumHBA(mol), CalcNumHBD(mol),
-                     get_net_charge(Chem.MolToSmiles(mol))])
+                     GetFormalCharge(mol)])
 
 
 def get_protonated_single(mol):
