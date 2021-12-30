@@ -1,41 +1,51 @@
+"""Write relevant physicochemical properties for each SMILES in all_zinc.smi"""
+
 from rdkit import Chem
+from multiprocessing import cpu_count
 from rdkit.Chem.Crippen import MolLogP
-from rdkit.Chem.Descriptors import ExactMolWt
 from rdkit.Chem.rdmolops import GetFormalCharge
 from concurrent.futures import ProcessPoolExecutor
-from rdkit.Chem.rdMolDescriptors import (CalcNumRotatableBonds,
+from rdkit.Chem.rdMolDescriptors import (CalcExactMolWt,
+                                         CalcNumRotatableBonds,
                                          CalcNumHBA,
                                          CalcNumHBD)
 
 
-def get_properties(smiles):
-    # XXX: ExactMolWt includes H-atom weight. Should it?
-    # XXX: CalcNumRotatableBonds is not "strict". Should it be?
-    # XXX: DUD-E authors used a different program that calculated miLogP. Is our
-    # proxy OK?
+NUM_CORES = cpu_count()
 
+print("Getting relevant physicochemical properties for all ZINC15 compounds...")
+
+
+def get_properties(smiles):
+    """Get a comma-separated line of the input SMILES compound's properties."""
+
+    # If the input SMILES is invalid, return an empty string.
     try:
         mol = Chem.MolFromSmiles(smiles)
-    except:
+    except Exception as e:
+        print(f"{smiles} could not be made to Mol: {e}")
         return ""
 
-    properties = [ExactMolWt(mol), MolLogP(mol),
-                  CalcNumRotatableBonds(mol),
+    properties = [CalcExactMolWt(mol), MolLogP(mol),
+                  CalcNumRotatableBonds(mol, strict=True),
                   CalcNumHBA(mol), CalcNumHBD(mol),
                   GetFormalCharge(mol)]
     return ",".join([str(prop) for prop in properties])
 
 
 def get_properties_batch(smiles_batch):
+    """Get property-lines of each SMILES in the input batch."""
+
     return [f"{smiles},{get_properties(smiles)}" for smiles in smiles_batch]
 
 
-print("Appending properties to data/all_zinc.smi")
+print("[1/1] Appending properties to data/all_zinc.smi ...")
 
 with open("data/all_zinc.smi", "r") as f:
     all_zinc = [smiles.strip("\n") for smiles in f.readlines()]
 
-indices = list(range(0, len(all_zinc), len(all_zinc) // 80)) + [-1]
+# Break the complete SMILES list into batches to be processed in parallel.
+indices = list(range(0, len(all_zinc), len(all_zinc) // NUM_CORES)) + [-1]
 input_subsets = []
 for i in range(len(indices) - 1):
     if indices[i + 1] != -1:
@@ -46,6 +56,7 @@ for i in range(len(indices) - 1):
 with ProcessPoolExecutor() as executor:
     with_properties = executor.map(get_properties_batch, input_subsets)
 
+# Flatten the batched sublists in with_properties for valid lines.
 with_properties = [line for sublist in with_properties
                    for line in sublist if line.split(",")[1]]
 
