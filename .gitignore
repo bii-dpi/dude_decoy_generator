@@ -1,8 +1,3 @@
-__pycache__
-data/all_zinc.smi
-data/bindingdb_actives_protonated_dict.pkl
-data/dude_actives_protonated_dict.pkl
-data/raw_files
+__pycache__/
+data/
 .DS_Store
-dudgen/.DS_Store
-dudgen/.Rapp.history
