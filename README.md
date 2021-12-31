@@ -18,3 +18,5 @@ TODO:
 1. Generalize dataset specification.
 2. Ensure data folders are created (and destroyed) automatically.
 3. **Ask if the protonated states are taken as individuals until the end: or else they will not be used at all.**
+4. Supply an example actives list.
+5. Consider removing the protein PDB ID requirement.
