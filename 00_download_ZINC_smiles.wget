@@ -1,6 +1,5 @@
 # Downloads all in-stock compounds from ZINC15.
-rm -rf data
-mkdir data
+rm -rf data/raw_files
 mkdir data/raw_files
 wget -q http://files.docking.org/2D/AA/AAAA.smi -O data/raw_files/AAAA.smi
 wget -q http://files.docking.org/2D/AA/AAAB.smi -O data/raw_files/AAAB.smi

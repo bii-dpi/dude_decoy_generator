@@ -20,7 +20,7 @@ np.random.seed(12345)
 print("Saving the SMILES of each input active's protonated states for pH 6-8...")
 
 
-def get_mol_dict(input_path):
+def get_mols(input_path):
     """Get Mol objects of all actives SMILES in referenced file."""
 
     def get_mol(smiles):
@@ -31,23 +31,31 @@ def get_mol_dict(input_path):
             return
 
     with open(input_path, "r") as f:
-        smiles = [line.split()[:2] for line in f.readlines()]
+        smiles = [line.strip("\n") for line in f.readlines()]
 
-    mols = [[get_mol(pair[0]), pair[0], pair[1]]
-            for pair in smiles]
+    mols = [[get_mol(curr_smiles), curr_smiles] for curr_smiles in smiles]
     old_len = len(mols)
     # Filter out SMILES that could not be converted to Mol objects.
-    mols = [triplet for triplet in mols if triplet[0]]
+    mols = [pair for pair in mols if pair[0]]
     if len(mols) != old_len:
         print(f"Warning: {old_len - len(mols)} actives SMILES could not be"
               f" processed.")
 
-    # Organize actives into a dictionary by the protein they belong to.
-    mol_dict = defaultdict(list)
-    for i in range(len(mols)):
-        mol_dict[mols[i][-1]].append(mols[i][:2])
+    return mols
 
-    return mol_dict
+
+def group_into_batches(mols):
+    """Group the Mol objects in the input list into batches of 128."""
+
+    batched_mols = []
+    indices = list(range(0, len(mols), 128)) + [-1]
+    for i in range(len(indices) - 1):
+        if indices[i + 1] == -1:
+            batched_mols.append(mols[indices[i]:])
+        else:
+            batched_mols.append(mols[indices[i]:indices[i + 1]])
+
+    return batched_mols
 
 
 def get_properties(mol):
@@ -94,19 +102,20 @@ def get_protonated_single(mol, orig_smiles):
             for mol_ in included_mols]
 
 
-def get_protonated(protein_mols):
-    """Get SMILES pairs for protonated forms of actives associated with the protein."""
+def get_protonated(curr_mol_batch):
+    """Get SMILES pairs for protonated forms of actives in the input list."""
 
     smiles_pairs = []
-    for mol, smiles in protein_mols:
+    for mol, smiles in curr_mol_batch:
         smiles_pairs += get_protonated_single(mol, smiles)
+
     return smiles_pairs
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Supply input and save paths.")
     # TODO: remove default after testing and make required=True.
-    parser.add_argument("-i", default="../get_data/BindingDB/bindingdb_actives",
+    parser.add_argument("-i", default="data/test_actives",
                         help="Relative path to input actives SMILES file.")
     parser.add_argument("-o", default=None,
                         help=(f"Relative path to output actives and protonated "
@@ -120,15 +129,19 @@ if __name__ == "__main__":
         print(f"No save path supplied; save path set to default: {save_path}")
 
     print("[1/3] Getting Mol object for each active...")
-    mol_dict = get_mol_dict(input_path)
+    mols = get_mols(input_path)
 
     print("[2/3] Protonating actives and saving those with unique property sets...")
+    # Batch the mols into batches of 128 to justify parallelization overhead.
+    batched_mols = group_into_batches(mols)
+
     with ProcessPoolExecutor() as executor:
-        all_pairs = executor.map(get_protonated, mol_dict.values())
+        all_pairs = executor.map(get_protonated, batched_mols)
     # Flatten active-protonated SMILES pair list.
     all_pairs = [pair for sublist in all_pairs for pair in sublist]
 
-    print("[3/3] Saving...")
+    print(f"[3/3] Saving {len(all_pairs)} SMILES pairs created from "
+          f"{len(mols)} actives...")
     with open(save_path, "w") as f:
         f.write("\n".join(all_pairs))
 
