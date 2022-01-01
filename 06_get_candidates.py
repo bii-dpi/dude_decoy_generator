@@ -12,14 +12,13 @@
 
 import os
 import argparse
-from shutil import rmtree
-import pickle
 import multiprocessing
-
 import numpy as np
 import pandas as pd
 import SharedArray as sa
-
+from pickle import dump
+from shutil import rmtree
+from collections import defaultdict
 from rdkit import Chem, DataStructs
 from progressbar import progressbar
 from rdkit.Chem.Crippen import MolLogP
@@ -31,14 +30,20 @@ from rdkit.Chem.rdMolDescriptors import (CalcExactMolWt,
                                          CalcNumHBD)
 
 
-
 np.random.seed(12345)
+# TODO: Need to make the saved indices ints.
 
+# Manage directories used for this program's storage.
 rmtree("data/sa", ignore_errors=True)
 os.makedirs("data/sa")
+
 if not os.path.isdir("data/cache"):
     os.makedirs("data/cache")
 
+if not os.path.isdir("data/candidate_dicts"):
+    os.makedirs("data/candidate_dicts")
+
+# Constants relating to properties decoy candidates are matched on.
 COLUMNS = ("smiles",
            "mol_wt", "logp", "num_rotatable", "num_hba", "num_hbd", "net_charge")
 MWT_RANGES =  [ 20,  35,  50,  65,  80, 100, 125]
@@ -49,6 +54,7 @@ NHD_RANGES =  [  0,   0,   1,   1,   2,   2,   3]
 CHG_RANGES =  [  0,   0,   0,   0,   0,   1,   2]
 RANGES = [MWT_RANGES, LOGP_RANGES, RB_RANGES, NHA_RANGES, NHD_RANGES, CHG_RANGES]
 
+# Help messages associated with command line arguments for this program.
 BATCH_HELP_MESSAGE = \
 """The size of the subset of input ligands to be processed concurrently. If the
 total number of ligands submitted for decoy candidate generation is 160, for
@@ -63,8 +69,15 @@ smaller batch size may be preferred when this program has to be stopped/started
 repeatedly, since batches that have been completed are saved and skipped on
 subsequent runs."""
 
+RESET_HELP_MESSAGE = \
+"""Reset the cache by deleting the stored results corresponding to the supplied
+job name. For correct results, this flag must be raised if new data is being
+supplied to the program or a different batch size is being used (under the same
+job name)."""
+
 
 def create_sa(prop):
+    """Lorem ipsum."""
     smiles = np.load(f"data/sorted/{prop}_smiles_reorder.npy")
     values = np.load(f"data/sorted/{prop}_values.npy")
 
@@ -77,25 +90,32 @@ def create_sa(prop):
     return smiles_, values_
 
 
+def get_batched_list(list_, batch_size):
+    """Get the batched input list."""
+
+    batched_list = []
+    indices = list(range(0, len(list_), batch_size)) + [-1]
+    for i in range(len(indices) - 1):
+        if indices[i + 1] == -1:
+            batched_list.append(list_[indices[i]:])
+        else:
+            batched_list.append(list_[indices[i]:indices[i + 1]])
+
+    return batched_list
+
+
 def get_batched_ligand_pairs(input_path, batch_size):
-    """Split referenced ligand pairs list into batches of batch_size."""
+    """Get referenced ligand pairs list split into batches."""
 
     with open(input_path, "r") as f:
        ligand_pairs = [line.strip("\n") for line in f.readlines()]
 
-    batched_ligand_pairs = []
-    indices = list(range(0, len(ligand_pairs), batch_size)) + [-1]
-    for i in range(len(indices) - 1):
-        if indices[i + 1] == -1:
-            batched_ligand_pairs.append(ligand_pairs[indices[i]:indices[i + 1]])
-        else:
-            batched_ligand_pairs.append(ligand_pairs[indices[i]:])
-
-    return batched_ligand_pairs
-
+    return get_batched_list(ligand_pairs, batch_size)
 
 
 def get_smiles_in_range(value, delta, curr_df):
+    """Lorem ipsum."""
+
     left_pos = np.searchsorted(curr_df[1], value - delta, side="left")
     right_pos = np.searchsorted(curr_df[1], value + delta, side="right")
 
@@ -110,6 +130,8 @@ def get_smiles_in_range(value, delta, curr_df):
 
 
 def get_property_matched(curr_ligand_props, window_index):
+    """Lorem ipsum."""
+
     all_matched = None
     for i in range(len(COLUMNS[1:])):
         if all_matched is None:
@@ -136,9 +158,10 @@ def get_properties(mol):
                      GetFormalCharge(mol)])
 
 
-def get_candidates(smiles):
+def get_candidates_single(smiles_pair):
     """Get candidate decoy indices for a single ligand."""
 
+    smiles = smiles_pair.split("_")[1]
     mol = Chem.MolFromSmiles(smiles)
     ligand_props = get_properties(mol)
 
@@ -178,66 +201,86 @@ def get_candidates(smiles):
         if len(tried_union) >= 3000:
             break
 
-    print(len(prop_matched_indices))
+#    print(len(prop_matched_indices))
 
     return prop_matched_indices
 
 
+def get_candidates(smiles_pair_list):
+    """Lorem ipsum."""
+
+    """
+    return [get_candidates_single(smiles_pair)
+            for smiles_pair in smiles_pair_list]
+    """
+    return get_candidates_single(smiles_pair_list)
+
+
 def write_candidate_dict(batched_ligand_pairs, num_cores, job_name):
     """Write the candidate dictionary for the dataset."""
-    batches_to_do = [batch_number
-                     for batch_number in range(len(batched_ligand_pairs))
-                     if not os.path.isfile(f"data/cache/{job_name}/{batch_number}")]
+    try:
+        batched_candidate_dict = \
+            pd.read_pickle(f"data/cache/{job_name}/batched_candidate_dict.pkl")
+        batches_to_do = [i for i in range(len(batched_ligand_pairs))
+                         if i not in batched_candidate_dict]
+    except:
+        batches_to_do = list(range(len(batched_ligand_pairs)))
 
     prefix = "Resuming" if batches_to_do[0] else "Starting"
     print(f"{prefix} job {job_name} from batch {batches_to_do[0]}/{len(batches_to_do)}...")
 
-    # TODO: remove serial alt when parallel confirmed.
-    #"""
-    candidate_dict = dict()
-    #"""
+    batched_candidate_dict = defaultdict(dict)
     for curr_batch in progressbar(batches_to_do):
-        #"""
-        for smiles_pair in progressbar(batched_ligand_pairs[curr_batch]):
-            candidate_dict[smiles_pair] = \
-                get_candidates(smiles_pair.split("_")[1])
-        #"""
-        """
         with ProcessPoolExecutor(max_workers=num_cores) as executor:
-            candidates = executor.map(get_candidates,
-                                      batched_ligand_pairs)
-
-        curr_candidate_dict = dict()
-        curr_smiles = list(LIGAND_DICT[pdb_id].keys())
-        for i, subset in enumerate(candidates):
-            curr_candidate_dict[curr_smiles[i]] = subset
+            candidates = list(executor.map(get_candidates,
+                                      batched_ligand_pairs[curr_batch]))
+        """
+                                      # Batch the batched list according to the
+                                      # number of cores to use.
+                                      get_batched_list(batched_ligand_pairs[curr_batch],
+                                                       num_cores))
+        candidates = [candidate_smiles for sublist in candidates
+                      for candidate_smiles in sublist]
         """
 
-        with open(f"data/candidates/{pdb_id}_candidate_dict.pkl", "wb") as f:
-            pickle.dump(curr_candidate_dict, f)
+        for i, smiles_pair in enumerate(batched_ligand_pairs[curr_batch]):
+            batched_candidate_dict[curr_batch][smiles_pair]= candidates[i]
 
-    print("Done.")
+        with open(f"data/cache/{job_name}/batched_candidate_dict.pkl", "wb") as f:
+            dump(batched_candidate_dict, f)
+
+    candidate_dict = dict()
+    for subdict in batched_candidate_dict.values():
+        for smiles_pair, decoy_candidates in subdict.items():
+            candidate_dict[smiles_pair] = decoy_candidates
+
+    with open(f"data/candidate_dicts/{job_name}.pkl", "wb") as f:
+        dump(candidate_dict, f)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Supply input and save paths.")
-    # TODO: remove default after testing and make required=True.
-    parser.add_argument("job_name", default="test",
+    parser.add_argument("job_name",
                         help=(f"Job name to be used to set the results cache "
-                              f"location."))
+                              f"location and decoy candidates."))
     # TODO: remove default after testing and make required=True.
     parser.add_argument("-i",
-                        default="../get_data/BindingDB/bindingdb_actives_protonated",
+                        default="data/test_actives_protonated",
                         help=(f"Relative path to input actives_protonated "
                               f"SMILES file as created by 04_get_protonated.py"))
-    parser.add_argument("--batch_size", default=128, help=BATCH_HELP_MESSAGE)
-    parser.add_argument("--num_cores", default=multiprocessing.cpu_count(),
+    parser.add_argument("--batch_size", default=128, type=int, help=BATCH_HELP_MESSAGE)
+    parser.add_argument("--num_cores", type=int, default=multiprocessing.cpu_count(),
                         help=(f"Number of CPU cores to use for processing every"
                               f" batch Default: all available cores."))
+    parser.add_argument("--reset", action="store_true", help=RESET_HELP_MESSAGE)
     args = vars(parser.parse_args())
 
-    if not os.path.isdir(f"data/cache/{args['job_name']}"):
-        os.makedirs(f"data/cache/{args['job_name']}")
+    cache_dir = f"data/cache/{args['job_name']}"
+    if not os.path.isdir(cache_dir):
+        os.makedirs(cache_dir)
+    elif args["reset"]:
+        rmtree(cache_dir, ignore_errors=True)
+        os.makedirs(cache_dir)
 
     print(f"Creating decoy candidates for {args['i']}")
 

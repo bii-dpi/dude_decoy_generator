@@ -1,9 +1,10 @@
+"""Lorem ipsum."""
+
 import os
 import pickle
-
+import argparse
 import numpy as np
 import pandas as pd
-
 from rdkit.Chem import AllChem
 from collections import Counter
 from rdkit import Chem, DataStructs
