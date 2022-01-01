@@ -15,5 +15,6 @@ Instructions:
 Credit: [Dimorphite-DL](https://durrantlab.pitt.edu/dimorphite-dl/) is used to generate ligands' protonated states, an essential step of DUD-E style decoy creation.
 
 TODO:
-1. Add a setup.py to do 00-03, and rename 04-06.
-2. 
+1. Add a setup.py to do 00-04, and rename 05-07.
+2. Clean 02, 06, 07.
+
