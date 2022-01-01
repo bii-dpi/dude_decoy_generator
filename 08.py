@@ -137,8 +137,10 @@ if __name__ == "__main__":
     print("[4/X] Sorting candidate SMILES by maximum Tc to keep the X% with the lowest Tcs...")
     # Should make this variable.
     maximum_tc = sorted(maximum_tc, key=lambda pair: pair[1])
+    maximum_tc = maximum_tc[:int(len(maximum_tc) / 4)]
+    maximum_tc = [pair[0] for pair in maximum_tc]
     with open(f"data/cache/{args['job_name']}/qualifying_candidates", "w") as f:
-        f.write("\n".join(maximum_tc[:int(len(maximum_tc) / 4)]))
+        f.write("\n".join(maximum_tc))
 
     print("Done.")
 
