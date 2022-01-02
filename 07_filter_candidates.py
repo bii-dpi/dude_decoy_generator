@@ -12,7 +12,7 @@ from collections import Counter, defaultdict
 from concurrent.futures import ProcessPoolExecutor
 
 
-print("Selecting and writing decoys from candidates for each active...")
+print("Filtering candidates by Tc...")
 
 np.random.seed(12345)
 
