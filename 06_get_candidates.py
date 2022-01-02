@@ -23,7 +23,6 @@ print("Finding decoy candidates for each active (and its protonated states)...")
 
 
 np.random.seed(12345)
-# TODO: Need to make the saved indices ints.
 
 # Manage directories used for this program's storage.
 rmtree("data/sa", ignore_errors=True)
