@@ -168,7 +168,7 @@ def get_candidates(smiles_pair):
 
         # If we have at least 3000 suitable indices, we do not need to try to
         # find more.
-        if len(prop_match_indices) >= 3000:
+        if len(prop_matched_indices) >= 3000:
             break
 
     return prop_matched_indices
