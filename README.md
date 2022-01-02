@@ -19,10 +19,10 @@ However, this tool can be quite slow. DUD-E's webtool claims it can create an av
 ### B. Supply the SMILES of ligands to generate decoys for
 A test file, `data/test_actives`, is available for trialling the following scripts' functionality.
 
-1. `05_get_protonated.py`: generates SMILES corresponding to the protonated states of the supplied actives in pH 6-8. Decoys are found for both the original active and these forms before combination.
-2. `06_get_candidates.py`: finds 3000-9000 property-matched decoy candidates for these actives and their protonated states.
-3. `07_filter_candidates.py`: combines all decoy candidates across the ligands for which decoys are being found, and keeps only the 25% most topologically-dissimilar to any one ligand (according to the Tanimoto coefficient).
-4. `08_write_decoys.py`: assigns candidates to actives from the filtered candidates in a manner that minimizes decoy duplication between actives.
+5. `05_get_protonated.py`: generates SMILES corresponding to the protonated states of the supplied actives in pH 6-8. Decoys are found for both the original active and these forms before combination.
+6. `06_get_candidates.py`: finds 3000-9000 property-matched decoy candidates for these actives and their protonated states.
+7. `07_filter_candidates.py`: combines all decoy candidates across the ligands for which decoys are being found, and keeps only the 25% most topologically-dissimilar to any one ligand (according to the Tanimoto coefficient).
+8. `08_write_decoys.py`: assigns candidates to actives from the filtered candidates in a manner that minimizes decoy duplication between actives.
 
 ## Requirements
 
