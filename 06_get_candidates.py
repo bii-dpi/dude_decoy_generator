@@ -1,14 +1,4 @@
-"""Lorem ipsum."""
-
-# Steps:
-# 1. Generate 50 decoys for each ligand in the *expanded* ligands dictionary
-# through property-matching to get between 3000 and 9000 candidate decoys.
-# 2. Across the candidates for each ligand, compute the maximum Tc (based on
-# ECFP4 fingerprints) between the candidate and any one associated ligand.
-# 3. Keep only the top 25% most dissimilar candidates.
-# 4. Deduplication thing.
-
-#need to have shuffling
+"""Find 3000-9000 decoy candidates for each active (and its protonated states)."""
 
 import os
 import argparse
@@ -28,6 +18,8 @@ from rdkit.Chem.rdMolDescriptors import (CalcExactMolWt,
                                          CalcNumRotatableBonds,
                                          CalcNumHBA,
                                          CalcNumHBD)
+
+print("Finding decoy candidates for each active (and its protonated states)...")
 
 
 np.random.seed(12345)
@@ -76,46 +68,10 @@ supplied to the program or a different batch size is being used (under the same
 job name)."""
 
 
-def create_sa(prop):
-    """Lorem ipsum."""
-    smiles = np.load(f"data/sorted/{prop}_smiles_reorder.npy")
-    values = np.load(f"data/sorted/{prop}_values.npy")
-
-    smiles_ = sa.create(f"file://data/sa/{prop}_smiles", smiles.shape, dtype=smiles.dtype)
-    values_ = sa.create(f"file://data/sa/{prop}_values", values.shape, dtype=values.dtype)
-
-    np.copyto(smiles_, smiles)
-    np.copyto(values_, values)
-
-    return smiles_, values_
-
-
-def get_batched_list(list_, batch_size):
-    """Get the batched input list."""
-
-    batched_list = []
-    indices = list(range(0, len(list_), batch_size)) + [-1]
-    for i in range(len(indices) - 1):
-        if indices[i + 1] == -1:
-            batched_list.append(list_[indices[i]:])
-        else:
-            batched_list.append(list_[indices[i]:indices[i + 1]])
-
-    return batched_list
-
-
-def get_batched_ligand_pairs(input_path, batch_size):
-    """Get referenced ligand pairs list split into batches."""
-
-    with open(input_path, "r") as f:
-       ligand_pairs = [line.strip("\n") for line in f.readlines()]
-
-    return get_batched_list(ligand_pairs, batch_size)
-
-
 def get_smiles_in_range(value, delta, curr_df):
-    """Lorem ipsum."""
+    """Get the SMILES indices that are within the property value range."""
 
+    # XXX: This can perhaps be made very slightly tighter.
     left_pos = np.searchsorted(curr_df[1], value - delta, side="left")
     right_pos = np.searchsorted(curr_df[1], value + delta, side="right")
 
@@ -130,8 +86,10 @@ def get_smiles_in_range(value, delta, curr_df):
 
 
 def get_property_matched(curr_ligand_props, window_index):
-    """Lorem ipsum."""
+    """Get the SMILES indices that are in-range for all six properties."""
 
+    # Keep the candidates that fall within property ranges for all six
+    # properties.
     all_matched = None
     for i in range(len(COLUMNS[1:])):
         if all_matched is None:
@@ -146,6 +104,7 @@ def get_property_matched(curr_ligand_props, window_index):
                                          assume_unique=True)
             if len(all_matched) == 0:
                 return None
+
     return all_matched
 
 
@@ -158,7 +117,7 @@ def get_properties(mol):
                      GetFormalCharge(mol)])
 
 
-def get_candidates_single(smiles_pair):
+def get_candidates(smiles_pair):
     """Get candidate decoy indices for a single ligand."""
 
     smiles = smiles_pair.split("_")[1]
@@ -167,24 +126,34 @@ def get_candidates_single(smiles_pair):
 
     prop_matched_indices = []
     window_index = 0
-    # XXX: What role does min have here? I think we can put a break if we've hit
-    # at least 3000.
     while len(prop_matched_indices) < 9000 and window_index < 7:
+        # Get the decoy candidate indices that correspond to the current range.
         latest = get_property_matched(ligand_props,
                                       window_index)
         window_index += 1
 
+        # If there were no candidates available for this strict a range,
+        # continue to the next iteration with a wider range.
         if latest is None:
             continue
 
+        # If there are no candidate indices currently stored, we can potentially
+        # use all of the latest. Otherwise, we will take a union of the two.
         if not len(prop_matched_indices):
             tried_union = latest.copy()
         else:
             tried_union = np.union1d(prop_matched_indices, latest)
 
+        # If this attempted new indices set is too large, it must be reduced in
+        # size. How exactly this is done depends on the number of novel indices
+        # that were found in the current iteration.
         if len(tried_union) > 9000:
             latest = np.setdiff1d(latest, prop_matched_indices,
                                   assume_unique=True)
+            # We try to sample exactly the number of new indices we need from
+            # the latest found to create a set of 9000. If this does not work
+            # because we have too few newly-found, we can include all of the
+            # novel indices into the indices set.
             try:
                 prop_matched_indices = \
                     np.union1d(prop_matched_indices,
@@ -192,86 +161,108 @@ def get_candidates_single(smiles_pair):
                                                 9000 - len(prop_matched_indices),
                                                 replace=False))
             except Exception as e:
-                #print(e)
                 prop_matched_indices = np.union1d(latest,
-                                                   prop_matched_indices)
+                                                  prop_matched_indices)
         else:
             prop_matched_indices = tried_union.copy()
 
-        if len(tried_union) >= 3000:
+        # If we have at least 3000 suitable indices, we do not need to try to
+        # find more.
+        if len(prop_match_indices) >= 3000:
             break
-
-#    print(len(prop_matched_indices))
 
     return prop_matched_indices
 
 
-def get_candidates(smiles_pair_list):
-    """Lorem ipsum."""
-
-    """
-    return [get_candidates_single(smiles_pair)
-            for smiles_pair in smiles_pair_list]
-    """
-    return get_candidates_single(smiles_pair_list)
-
-
 def write_candidate_dict(batched_ligand_pairs, num_cores, job_name):
     """Write the candidate dictionary for the dataset."""
+
+    # Find the indices of the batches still to be completed.
     try:
         batched_candidate_dict = \
             pd.read_pickle(f"data/cache/{job_name}/batched_candidate_dict.pkl")
         batches_to_do = [i for i in range(len(batched_ligand_pairs))
                          if i not in batched_candidate_dict]
     except:
+        batched_candidate_dict = defaultdict(dict)
         batches_to_do = list(range(len(batched_ligand_pairs)))
 
     prefix = "Resuming" if batches_to_do[0] else "Starting"
-    print(f"{prefix} job {job_name} from batch {batches_to_do[0]}/{len(batches_to_do)}...")
+    print(f"{prefix} job {job_name} from batch {batches_to_do[0]}/{len(batches_to_do)}")
 
-    batched_candidate_dict = defaultdict(dict)
     for curr_batch in progressbar(batches_to_do):
+        # Get the list of candidates for each SMILES pair in the batch.
         with ProcessPoolExecutor(max_workers=num_cores) as executor:
             candidates = list(executor.map(get_candidates,
-                                      batched_ligand_pairs[curr_batch]))
-        """
-                                      # Batch the batched list according to the
-                                      # number of cores to use.
-                                      get_batched_list(batched_ligand_pairs[curr_batch],
-                                                       num_cores))
-        candidates = [candidate_smiles for sublist in candidates
-                      for candidate_smiles in sublist]
-        """
+                                           batched_ligand_pairs[curr_batch]))
 
+        # Store these lists in the batched candidte dictionary, under this batch
+        # number.
         for i, smiles_pair in enumerate(batched_ligand_pairs[curr_batch]):
-            batched_candidate_dict[curr_batch][smiles_pair]= candidates[i]
+            batched_candidate_dict[curr_batch][smiles_pair] = candidates[i]
 
+        # Overwrite the batched candidate dictionary.
         with open(f"data/cache/{job_name}/batched_candidate_dict.pkl", "wb") as f:
             dump(batched_candidate_dict, f)
 
+    # Now that all batches have been processed, remove the batch number from the
+    # batched candidate dictionary to create the candidate dictionary.
     candidate_dict = dict()
     for subdict in batched_candidate_dict.values():
-        for smiles_pair, decoy_candidates in subdict.items():
-            candidate_dict[smiles_pair] = decoy_candidates
+        candidate_dict.update(subdict)
 
     with open(f"data/candidate_dicts/{job_name}.pkl", "wb") as f:
         dump(candidate_dict, f)
 
 
+def get_batched_ligand_pairs(input_path, batch_size):
+    """Get referenced ligand pairs list split into batches."""
+
+    with open(input_path, "r") as f:
+       ligand_pairs = [line.strip("\n") for line in f.readlines()]
+
+    batched_ligand_pairs = []
+    indices = list(range(0, len(ligand_pairs), batch_size)) + [-1]
+    for i in range(len(indices) - 1):
+        if indices[i + 1] == -1:
+            batched_ligand_pairs.append(ligand_pairs[indices[i]:])
+        else:
+            batched_ligand_pairs.append(ligand_pairs[indices[i]:indices[i + 1]])
+
+    return batched_ligand_pairs
+
+
+def create_sa(prop):
+    """Put the pre-sorted SMILES arrays and properties in shared memory."""
+
+    smiles = np.load(f"data/sorted/{prop}_smiles_reorder.npy")
+    values = np.load(f"data/sorted/{prop}_values.npy")
+
+    smiles_ = sa.create(f"file://data/sa/{prop}_smiles", smiles.shape, dtype=smiles.dtype)
+    values_ = sa.create(f"file://data/sa/{prop}_values", values.shape, dtype=values.dtype)
+
+    np.copyto(smiles_, smiles)
+    np.copyto(values_, values)
+
+    return smiles_, values_
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Supply input and save paths.")
+    SORTED_ZINC_DFS = [create_sa(prop) for prop in COLUMNS[1:]]
+
+    parser = argparse.ArgumentParser(description="Supply job name and input path.")
     parser.add_argument("job_name",
-                        help=(f"Job name to be used to set the results cache "
-                              f"location and decoy candidates."))
+                        help=("Job name to be used to set the results cache "
+                              "location and save the decoy candidates."))
     # TODO: remove default after testing and make required=True.
     parser.add_argument("-i",
                         default="data/test_actives_protonated",
-                        help=(f"Relative path to input actives_protonated "
-                              f"SMILES file as created by 04_get_protonated.py"))
+                        help=("Relative path to input actives_protonated "
+                              "SMILES file as created by 04_get_protonated.py"))
     parser.add_argument("--batch_size", default=128, type=int, help=BATCH_HELP_MESSAGE)
     parser.add_argument("--num_cores", type=int, default=multiprocessing.cpu_count(),
-                        help=(f"Number of CPU cores to use for processing every"
-                              f" batch Default: all available cores."))
+                        help=("Number of CPU cores to use for processing every"
+                              " batch Default: all available cores."))
     parser.add_argument("--reset", action="store_true", help=RESET_HELP_MESSAGE)
     args = vars(parser.parse_args())
 
@@ -282,10 +273,6 @@ if __name__ == "__main__":
         rmtree(cache_dir, ignore_errors=True)
         os.makedirs(cache_dir)
 
-    print(f"Creating decoy candidates for {args['i']}")
-
-    SORTED_ZINC_DFS = [create_sa(prop) for prop in COLUMNS[1:]]
-
     print("[1/2] Loading data...")
     batched_ligand_pairs = get_batched_ligand_pairs(args["i"], args["batch_size"])
 
@@ -295,4 +282,5 @@ if __name__ == "__main__":
                          args["job_name"])
 
     print("Done.")
+
 

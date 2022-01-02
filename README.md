@@ -16,6 +16,5 @@ Credit: [Dimorphite-DL](https://durrantlab.pitt.edu/dimorphite-dl/) is used to g
 
 TODO:
 1. Add a setup.py to do 00-04, and rename 05-07.
-2. Clean 06.
-3. Enhance readme.
+2. Enhance readme.
 
