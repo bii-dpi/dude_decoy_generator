@@ -6,7 +6,7 @@ However, this tool can be quite slow. DUD-E's webtool claims it can create an av
 
 **This repository thus offers a self-contained, purely Pythonic approach to generating decoys in the DUD-E style.**
 
-## Instructions:
+## Instructions
 
 ### A. Set up the data regarding compounds to be used as potential decoys
 
