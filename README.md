@@ -33,6 +33,7 @@ Python 3.7
 1. progressbar2==3.55.0
 2. numpy==1.21.5
 3. pandas==1.3.5
+4. SharedArray==3.2.1
 
 ### conda recommended
 
