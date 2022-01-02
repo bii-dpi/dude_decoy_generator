@@ -13,7 +13,7 @@ However, this tool can be quite slow. DUD-E's webtool claims it can create an av
 0. `00_download_ZINC_smiles.wget`: downloads SMILES for all ZINC15 compounds in stock to `data/raw_files/`.
 1. `01_combine_smis.py`: combines the SMILES text files in `data/raw_files` into one file of ~15 million compounds, `all_zinc.smi`.
 2. `02_get_fingerprints.py`: generates ECFP4 fingerprints for all compounds, and stores them in `data/fingerprints/ecfp4`. Support for other fingerprinting methods planned. Fingerprints are used in selecting the compounds most topologically-dissimilar to their corresponding actives.
-3. `03_get_decoy_properties.py`: generates six physicochemical properties (molecular weight, logP, number of rotatable bonds, number of hydrogen bond acceptors and donors, and net charge) for all compounds. Decoys are selected to property-match their corresponding actives.
+3. `03_get_decoy_properties.py`: generates six physicochemical properties (molecular weight, logP, number of rotatable bonds, number of hydrogen bond acceptors and donors, and net charge) for all compounds, and stores them in `data/all_zinc_w_prop.csv". Decoys are selected to property-match their corresponding actives.
 4. `04_sort_ligands.py`: stores arrays of these compunds sorted by these six properties. Pre-sorted arrays are stored to make property-matching during decoy selection faster through enabling binary search.
 
 ### B. Supply the SMILES of ligands to generate decoys for
