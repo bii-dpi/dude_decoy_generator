@@ -2,6 +2,7 @@
 
 import os
 from pickle import dump
+from shutil import rmtree
 from rdkit.Chem import AllChem
 from rdkit import Chem, DataStructs
 from concurrent.futures import ProcessPoolExecutor
@@ -12,8 +13,9 @@ print("Getting ECFP4 fingerprints for all ZINC15 compounds...")
 
 if not os.path.isdir("data/fingerprints"):
     os.makedirs("data/fingerprints")
-if not os.path.isdir("data/fingerprints/ecfp4"):
-    os.makedirs("data/fingerprints/ecfp4")
+
+rmtree("data/fingerprints/ecfp4", ignore_errors=True)
+os.makedirs("data/fingerprints/ecfp4")
 
 
 def get_fingerprint(smiles):
