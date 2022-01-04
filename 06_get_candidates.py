@@ -168,7 +168,7 @@ def get_candidates(smiles_pair):
 
         # If we have at least 3000 suitable indices, we do not need to try to
         # find more.
-        if len(prop_match_indices) >= 3000:
+        if len(prop_matched_indices) >= 3000:
             break
 
     return prop_matched_indices
@@ -254,9 +254,7 @@ if __name__ == "__main__":
     parser.add_argument("job_name",
                         help=("Job name to be used to set the results cache "
                               "location and save the decoy candidates."))
-    # TODO: remove default after testing and make required=True.
-    parser.add_argument("-i",
-                        default="data/test_actives_protonated",
+    parser.add_argument("-i", required=True,
                         help=("Relative path to input actives_protonated "
                               "SMILES file as created by 04_get_protonated.py"))
     parser.add_argument("--batch_size", default=128, type=int, help=BATCH_HELP_MESSAGE)

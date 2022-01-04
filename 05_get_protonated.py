@@ -114,8 +114,7 @@ def get_protonated(curr_mol_batch):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Supply input and save paths.")
-    # TODO: remove default after testing and make required=True.
-    parser.add_argument("-i", default="data/test_actives",
+    parser.add_argument("-i", required=True,
                         help="Relative path to input actives SMILES file.")
     parser.add_argument("-o", default=None,
                         help=(f"Relative path to output actives and protonated "

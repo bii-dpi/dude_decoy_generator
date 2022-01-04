@@ -178,6 +178,9 @@ class ArgParseFuncs:
             "--smiles", metavar="SMI", type=str, help="SMILES string to protonate"
         )
         parser.add_argument(
+            "-i", type=str
+        )
+        parser.add_argument(
             "--smiles_file",
             metavar="FILE",
             type=str,
