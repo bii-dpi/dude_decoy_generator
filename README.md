@@ -26,7 +26,7 @@ A test file, `data/test_actives`, is available for trialling the following scrip
 
 To generate decoys for `data/test_actives`, for example:
 
-    python 05_get_protonated.py -i /data/test_actives
+    python 05_get_protonated.py -i data/test_actives
     python 06_get_candidates.py test -i data/test_actives_protonated [num_cores]
     python 07_filter_candidates.py $job_name
     python 08_write_decoys.py $job_name [o]
