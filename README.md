@@ -24,6 +24,12 @@ A test file, `data/test_actives`, is available for trialling the following scrip
 7. `07_filter_candidates.py`: combines all decoy candidates across the ligands for which decoys are being found, and keeps only the 25% most topologically-dissimilar to any one ligand (according to the Tanimoto coefficient).
 8. `08_write_decoys.py`: assigns candidates to actives from the filtered candidates in a manner that minimizes decoy duplication between actives.
 
+To generate decoys for `data/test_actives`, for example:
+python 05_get_protonated.py -i /data/test_actives
+python 06_get_candidates.py test -i data/test_actives_protonated [num_cores]
+python 07_filter_candidates.py $job_name
+python 08_write_decoys.py $job_name [o]
+
 ## Requirements
 
 Python 3.7
