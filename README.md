@@ -33,7 +33,7 @@ To generate decoys for `data/test_actives`, for example:
 
 ## Requirements
 
-Python 3.7
+Python 3
 
 ### pip recommended
 
