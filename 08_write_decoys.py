@@ -12,6 +12,7 @@ print("Selecting and writing decoys for each active...")
 
 ZINC_SMILES = np.load("data/all_zinc_smiles_ref.npy",
                       allow_pickle=True).flatten()
+ID_dict = pd.read_pickle("data/zinc_dict.pkl")
 
 
 def write_decoys(path, dict_):
@@ -20,7 +21,7 @@ def write_decoys(path, dict_):
     to_write = []
     for active_smiles, decoy_list in dict_.items():
         for decoy_smiles in decoy_list:
-            to_write.append(f"{active_smiles} {decoy_smiles}")
+            to_write.append(f"{active_smiles} {decoy_smiles} {ID_dict[decoy_smiles]}")
 
     with open(path, "w") as f:
         f.write("\n".join(to_write))
