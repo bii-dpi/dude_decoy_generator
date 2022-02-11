@@ -124,7 +124,9 @@ if __name__ == "__main__":
 
     print(f"[3/3] Writing decoys...")
     write_decoys(output_path, decoys_dict)
-    write_decoys(failed_output_path, failed_dict)
+    try:
+        write_decoys(failed_output_path, failed_dict)
+    except:
+        pass
 
     print("Done.")
-
