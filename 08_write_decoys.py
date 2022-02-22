@@ -1,5 +1,6 @@
 """Write decoys from qualifying candidates to disk."""
 
+import os
 import argparse
 import numpy as np
 import pandas as pd
@@ -12,10 +13,9 @@ print("Selecting and writing decoys for each active...")
 
 ZINC_SMILES = np.load("data/all_zinc_smiles_ref.npy",
                       allow_pickle=True).flatten()
-ID_dict = pd.read_pickle("data/zinc_dict.pkl")
 
 
-def write_decoys(path, dict_):
+def write_decoys(path, dict_, ID_dict):
     """Write decoys in the input dictionary to path."""
 
     to_write = []
@@ -123,9 +123,15 @@ if __name__ == "__main__":
     print(pretty_props[:-1])
 
     print(f"[3/3] Writing decoys...")
-    write_decoys(output_path, decoys_dict)
+    del candidate_dict
+
+    ID_df = pd.read_csv("data/smiles_to_id.csv", header=0, names=["SMILES", "ZINC ID"])
+    ID_dict = dict(zip(ID_df["SMILES"].tolist(), ID_df["ZINC ID"].tolist()))
+    del ID_df
+
+    write_decoys(output_path, decoys_dict, ID_dict)
     try:
-        write_decoys(failed_output_path, failed_dict)
+        write_decoys(failed_output_path, failed_dict, ID_dict)
     except:
         pass
 

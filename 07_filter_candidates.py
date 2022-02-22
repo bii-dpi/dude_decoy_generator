@@ -61,6 +61,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Supply job name.")
     parser.add_argument("job_name",
                         help="Job name to be used to load the decoy candidates.")
+    parser.add_argument("--low_memory", action="store_true",
+                        help=("If the low memory flag is raised, will alternate "
+                              "to a slower, but less memory-intensive method of "
+                              "computing fingerprints."))
     args = vars(parser.parse_args())
 
     print(f"[1/4] Loading decoy candidate dictionary...")
@@ -80,20 +84,31 @@ if __name__ == "__main__":
 
     # Get decoy candidates' fingerprints.
     print("Decoy candidates")
-    with open("data/all_zinc.smi", "r") as f:
-        all_zinc = [smiles.strip("\n") for smiles in f.readlines()]
+    # If memory is a constraint, generate fingerprints for the candidate decoys.
+    # Otherwise, load the pre-computed fingerprint dictionary of all ZINC15
+    # compounds.
+    if not args["low_memory"]:
+        with open("data/all_zinc.smi", "r") as f:
+            all_zinc = [smiles.strip("\n") for smiles in f.readlines()]
 
-    indices = list(range(0, len(all_zinc), 10000)) + [-1]
-    input_subsets = []
-    for i in range(len(indices) - 1):
-        if indices[i + 1] != -1:
-            input_subsets.append((all_zinc[indices[i]:indices[i + 1]], indices[i]))
-        else:
-            input_subsets.append((all_zinc[indices[i]:], indices[i]))
+        indices = list(range(0, len(all_zinc), 10000)) + [-1]
+        input_subsets = []
+        for i in range(len(indices) - 1):
+            if indices[i + 1] != -1:
+                input_subsets.append((all_zinc[indices[i]:indices[i + 1]], indices[i]))
+            else:
+                input_subsets.append((all_zinc[indices[i]:], indices[i]))
 
-    candidates_fprint_dict = dict()
-    for input_subset, i in progressbar(input_subsets):
-        candidates_fprint_dict.update(get_fprint_subdict(input_subset, i))
+        candidates_fprint_dict = dict()
+        for input_subset, i in progressbar(input_subsets):
+            candidates_fprint_dict.update(get_fprint_subdict(input_subset, i))
+    else:
+        candidates_fprint_dict = dict()
+        for smiles_pair in progressbar(candidate_dict):
+            for cand_smiles in candidate_dict[smiles_pair]:
+                if cand_smiles not in candidates_fprint_dict:
+                    candidates_fprint_dict[cand_smiles] = \
+                        get_fingerprint(cand_smiles)
 
     print(f"[3/4] Calculating maximum Tc between decoy candidates and "
           f"corresponding actives...")
