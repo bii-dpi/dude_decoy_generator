@@ -1,4 +1,4 @@
-# Generate DUD-E style decoys in (only) Python
+# Generate DUD-E style decoys using Python
 
 The Directory of Useful Decoys (Enhanced) provides [a useful webtool](http://dude.docking.org/generate) to generate DUD-E style decoys for custom ligand sets.
 
